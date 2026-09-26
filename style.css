@@ -16,12 +16,16 @@ header{padding:28px 6vw 0;display:flex;align-items:center;justify-content:space-
 .brand span{color:var(--orange);}
 .brand small{color:var(--muted);font-size:12.5px;font-weight:500;}
 
+.header-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+
 .addbtn{background:var(--orange);color:#181008;border:none;padding:12px 20px;border-radius:10px;
   font-family:Inter;font-weight:600;font-size:14.5px;cursor:pointer;display:flex;align-items:center;gap:8px;
   box-shadow:0 6px 20px -6px rgba(255,122,26,.55); transition:transform .15s ease, box-shadow .15s ease, background .15s ease;}
 .addbtn:hover{transform:translateY(-1px);box-shadow:0 10px 26px -6px rgba(255,122,26,.7);background:#ff8b38;}
 .addbtn:active{transform:translateY(0);}
 .addbtn svg{width:16px;height:16px;}
+.addbtn.ghostbtn{background:var(--surface-2);color:var(--text);box-shadow:none;border:1px solid var(--border);}
+.addbtn.ghostbtn:hover{background:var(--surface);border-color:#45454d;box-shadow:none;}
 
 .dash{margin:26px 6vw 8px;padding:22px 26px;background:linear-gradient(155deg,#1a1410 0%, var(--surface) 55%);
   border:1px solid var(--border);border-radius:16px;display:flex;gap:40px;flex-wrap:wrap;}
