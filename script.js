@@ -28,7 +28,59 @@ function load(){
   }catch(e){ animes = seed.slice(); }
 }
 function save(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(animes)); }catch(e){ console.error('Speichern fehlgeschlagen', e); }
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(animes));
+    return true;
+  }catch(e){
+    console.error('Speichern fehlgeschlagen', e);
+    showSaveErrorToast();
+    return false;
+  }
+}
+
+function showSaveErrorToast(){
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-error';
+  toast.innerHTML = `
+    <span>⚠ Speichern fehlgeschlagen – Speicherlimit voll (zu viele/große Cover-Bilder). Änderung wurde NICHT gesichert.</span>
+    <button class="toast-x" type="button" aria-label="Schließen">✕</button>
+  `;
+  container.appendChild(toast);
+  requestAnimationFrame(()=>toast.classList.add('show'));
+  const dismiss = ()=>{ clearTimeout(timeoutId); toast.classList.remove('show'); setTimeout(()=>toast.remove(), 250); };
+  const timeoutId = setTimeout(dismiss, 9000);
+  toast.querySelector('.toast-x').addEventListener('click', dismiss);
+}
+
+/* Bild vor dem Speichern verkleinern/komprimieren, damit localStorage nicht überläuft */
+function resizeImageFile(file, maxDim, quality){
+  maxDim = maxDim || 500;
+  quality = quality || 0.72;
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if(w > h && w > maxDim){ h = Math.round(h * (maxDim/w)); w = maxDim; }
+        else if(h >= w && h > maxDim){ w = Math.round(w * (maxDim/h)); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        try{
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }catch(e){
+          resolve(reader.result); // Fallback: Original-DataURL
+        }
+      };
+      img.onerror = ()=>resolve(reader.result); // Fallback: Original-DataURL
+      img.src = reader.result;
+    };
+    reader.onerror = ()=>resolve(null);
+    reader.readAsDataURL(file);
+  });
 }
 
 function renderDash(){
@@ -275,16 +327,18 @@ function toggleWatchlistFields(){
 }
 document.getElementById('f_status').addEventListener('change', ()=>{ toggleProgressField(); toggleWatchlistFields(); });
 
-document.getElementById('f_cover').addEventListener('change', e=>{
+document.getElementById('f_cover').addEventListener('change', async e=>{
   const file = e.target.files[0];
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    pendingCover = reader.result;
+  document.getElementById('coverUploadText').textContent = 'Wird verarbeitet...';
+  const dataUrl = await resizeImageFile(file, 600, 0.75);
+  if(dataUrl){
+    pendingCover = dataUrl;
     document.getElementById('coverUploadText').textContent = 'Cover ausgewählt ✓';
     document.getElementById('coverUpload').classList.add('has');
-  };
-  reader.readAsDataURL(file);
+  }else{
+    document.getElementById('coverUploadText').textContent = 'Bild konnte nicht gelesen werden';
+  }
 });
 
 document.getElementById('animeForm').addEventListener('submit', e=>{
@@ -325,13 +379,6 @@ document.getElementById('massAddInput').addEventListener('change', async e=>{
   const files = Array.from(e.target.files || []);
   if(!files.length) return;
 
-  const readAsDataURL = file => new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onload = ()=>resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
   function nameFromFile(file){
     const withoutExt = file.name.replace(/\.[^/.]+$/, '');
     return withoutExt.trim() || 'Unbenannt';
@@ -341,8 +388,7 @@ document.getElementById('massAddInput').addEventListener('change', async e=>{
   let baseTime = Date.now();
   for(const file of files){
     if(!file.type.startsWith('image/')) continue;
-    let cover = null;
-    try{ cover = await readAsDataURL(file); }catch(err){ console.error('Cover konnte nicht gelesen werden', err); }
+    const cover = await resizeImageFile(file, 500, 0.7);
     animes.unshift({
       id: generateId(),
       name: nameFromFile(file),
@@ -361,9 +407,10 @@ document.getElementById('massAddInput').addEventListener('change', async e=>{
     added++;
   }
 
-  save(); renderAll();
+  const ok = save();
+  renderAll();
   e.target.value = '';
-  if(added) showMassAddToast(added);
+  if(added && ok) showMassAddToast(added);
 });
 
 function showMassAddToast(count){
