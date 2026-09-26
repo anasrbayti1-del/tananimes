@@ -316,6 +316,75 @@ document.getElementById('animeForm').addEventListener('submit', e=>{
   save(); renderAll(); closeForm();
 });
 
+/* --- Mehrfach hinzufügen (mass add) --- */
+document.getElementById('openMassAdd').addEventListener('click', ()=>{
+  document.getElementById('massAddInput').click();
+});
+
+document.getElementById('massAddInput').addEventListener('change', async e=>{
+  const files = Array.from(e.target.files || []);
+  if(!files.length) return;
+
+  const readAsDataURL = file => new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  function nameFromFile(file){
+    const withoutExt = file.name.replace(/\.[^/.]+$/, '');
+    return withoutExt.trim() || 'Unbenannt';
+  }
+
+  let added = 0;
+  let baseTime = Date.now();
+  for(const file of files){
+    if(!file.type.startsWith('image/')) continue;
+    let cover = null;
+    try{ cover = await readAsDataURL(file); }catch(err){ console.error('Cover konnte nicht gelesen werden', err); }
+    animes.unshift({
+      id: generateId(),
+      name: nameFromFile(file),
+      status: 'watchlist',
+      priority: 'normal',
+      comment: '',
+      watched: '',
+      videolink: '',
+      notes: '',
+      favorite: false,
+      cover: cover,
+      episodes: null,
+      currentEpisode: null,
+      addedAt: baseTime++
+    });
+    added++;
+  }
+
+  save(); renderAll();
+  e.target.value = '';
+  if(added) showMassAddToast(added);
+});
+
+function showMassAddToast(count){
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `
+    <span>${count} ${count===1?'Anime':'Animes'} zur Watchlist hinzugefügt</span>
+    <button class="toast-x" type="button" aria-label="Schließen">✕</button>
+  `;
+  container.appendChild(toast);
+  requestAnimationFrame(()=>toast.classList.add('show'));
+  const dismiss = ()=>{
+    clearTimeout(timeoutId);
+    toast.classList.remove('show');
+    setTimeout(()=>toast.remove(), 250);
+  };
+  const timeoutId = setTimeout(dismiss, 5000);
+  toast.querySelector('.toast-x').addEventListener('click', dismiss);
+}
+
 document.getElementById('deleteBtn').addEventListener('click', ()=>{
   if(!editingId) return;
   const id = editingId;
